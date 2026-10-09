@@ -93,8 +93,8 @@ Reference: Sidero Labs [Deploying Cilium — Without kube-proxy + Gateway API](h
 ### Deployment DAG
 
 ```
-helm_release.gateway_api (christianhuth/gateway-api-crds 1.2.3 → app v1.6.1, standard)
-  → helm_release.cilium (cilium/cilium 1.20.1, wait=true timeout 1800, values modules/platform/values/cilium/values.yaml)
+helm_release.gateway_api (christianhuth/gateway-api-crds 1.2.4, standard)
+  → helm_release.cilium (cilium/cilium 1.20.2, wait=true timeout 1800, values modules/platform/values/cilium/values.yaml)
     → terraform_data.wait_nodes (kubectl wait --for=condition=Ready nodes)
       → helm_release.argocd
 ```

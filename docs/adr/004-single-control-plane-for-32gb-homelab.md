@@ -1,8 +1,8 @@
 # 4. Single Control-Plane for 32 GiB Homelab (current 1×6 + 3×6)
 
-* **Status:** Accepted (amended 2026-09-06; updated 2026-09-14 — see Update 2026-09-14 below)
+* **Status:** Accepted (amended 2026-09-06; updated 2026-09-14 and 2026-09-29 — see the dated updates below)
 * **Date:** 2026-09-06
-* **Updated:** 2026-09-14 — aligned to `terraform.tfvars` + TrueNAS 2c/4GB
+* **Updated:** 2026-09-29 — worker vCPU `4` → `6` and worker CPU pinning disabled (CHANGELOG 2.3.0)
 * **Deciders:** Seom88
 * **Tags:** talos, proxmox, etcd, topology, homelab, cost
 
@@ -46,17 +46,23 @@ Run **single control-plane + three workers**: current deployed shape **`1×6 + 3
 | Role | Hostname | IP | Cores | Memory | Disk 0 | Disk 1 (data) | `allow_scheduling` |
 |------|----------|----|-------|--------|--------|---------------|--------------------|
 | control-plane | `talos-cp1` | `10.10.0.11` | 4 | `6×1024` | `40 GiB local-lvm` | none (EPHEMERAL only) | `false` |
-| worker | `talos-w1` | `10.10.0.101` | 4 | `6×1024` | `40 GiB local-lvm` | `150 GiB ssd01` | `true` |
-| worker | `talos-w2` | `10.10.0.102` | 4 | `6×1024` | `40 GiB local-lvm` | `150 GiB ssd01` | `true` |
-| worker | `talos-w3` | `10.10.0.103` | 4 | `6×1024` | `40 GiB local-lvm` | `150 GiB ssd01` | `true` |
+| worker | `talos-w1` | `10.10.0.101` | 6 | `6×1024` | `40 GiB local-lvm` | `150 GiB ssd01` | `true` |
+| worker | `talos-w2` | `10.10.0.102` | 6 | `6×1024` | `40 GiB local-lvm` | `150 GiB ssd01` | `true` |
+| worker | `talos-w3` | `10.10.0.103` | 6 | `6×1024` | `40 GiB local-lvm` | `150 GiB ssd01` | `true` |
 
-All on `pve01`. OS disks on `local-lvm`, data disks on `ssd01`. CPU: `cpu_units` CP `200` vs workers `100` each (relative weight only), `cpu_affinity = "2-5,8-11"` desired in `tfvars` for all four Talos VMs, applied via privileged `just affinity-sync` (host/TrueNAS IRQs reserved on 0-1). vCPU assigned: 16 Talos + 2 TrueNAS = 18 on 6c/12t.
+All on `pve01`. OS disks on `local-lvm` (SCSI `scsi0`, `virtio-scsi-single`), data disks on `ssd01`. Every VM also gets a dedicated **5 GiB swap backing disk** in `local-lvm` (CHANGELOG 2.3.0) behind a fixed 4 GiB `SwapVolumeConfig` — see [Architecture: Memory / swap design](./../architecture.md#memory--swap-design). CPU: the control-plane pin (`cpu_units = 200`, `cpu_affinity = "2-5,8-11"`) stays active, while worker `cpu_units`/`cpu_affinity` are commented out in `tfvars` since 2026-09-29 — `just affinity-sync` emits no worker rows and workers float until contention says otherwise. vCPU assigned: 18 Talos (CP 4 + 3×6) + 2 TrueNAS = 20 on 6c/12t.
 
 * **CP:** Talos `controlplane` role, `NoSchedule` taint, no `UserVolumeConfig`, no Longhorn replicas (`Schedulable=false`). `longhorn-manager` DaemonSet still runs for CSI hooks.
 * **Workers:** `worker` role, each with `150 GiB` data disk on `ssd01` → `UserVolumeConfig "data"` (`/var/mnt/data`). Longhorn replicas constrained to workers. 6 GiB = 5.48 GiB allocatable vs 3.29 GiB on 4 GiB.
-* **Terraform:** `environments/proxmox/prod/terraform.tfvars` — `nodes_cp` (single entry, `cores = 4`, `memory = 6*1024`, `datastore = "local-lvm"`, `cpu_units = 200`, `cpu_affinity = "2-5,8-11"`, no data disk) + `nodes_worker` (three entries, `cores = 4`, `memory = 6*1024`, `datastore = "local-lvm"`, `cpu_units = 100`, `cpu_affinity = "2-5,8-11"`, `disks = [{ name = "data", size = 150, datastore = "ssd01" }]`). `modules/talos-cluster` maps `allow_scheduling` to `kubernetesAllowSchedulingOnControlPlanes` + taint.
+* **Terraform:** `environments/proxmox/prod/terraform.tfvars` — `nodes_cp` (single entry, `cores = 4`, `memory = 6*1024`, `datastore = "local-lvm"`, `cpu_units = 200`, `cpu_affinity = "2-5,8-11"`, no data disk) + `nodes_worker` (three entries, `cores = 6`, `memory = 6*1024`, `datastore = "local-lvm"`, `cpu_units`/`cpu_affinity` commented out since 2026-09-29, `disks = [{ name = "data", size = 150, datastore = "ssd01" }]`). `modules/talos-cluster` maps `allow_scheduling` to `kubernetesAllowSchedulingOnControlPlanes` + taint; `modules/proxmox` adds the 5 GiB swap backing disk after the data disks.
 * **Behavior:** `talos_cluster_health` targets only `10.10.0.11`. KubePrism `localhost:7445` fronts single apiserver, no VIP failover needed.
 * **Revert:** `tfvars`-only. Re-add `talos-cp2/cp3` + `talosctl etcd join`, no worker state surgery, no Cilium/Longhorn reinstall.
+
+### Update 2026-09-29 — worker vCPU 4→6, worker pinning disabled, swap backing (CHANGELOG 2.3.0)
+
+* **Workers `cores` `4` → `6`** in `terraform.tfvars`: allocatable headroom back for the wishlist after the swap disk cost nothing extra (swap is a fixed-size block device, not RAM).
+* **Worker CPU pinning disabled:** `cpu_units = 100` and `cpu_affinity = "2-5,8-11"` are commented out for all three workers, so `just affinity-sync` emits no prod worker rows and `cpu_units` falls back to the Proxmox default. Only the control-plane pin (`cpu_units = 200`, `cpu_affinity = "2-5,8-11"`) remains truthful config.
+* **Swap:** every VM gained a dedicated 5 GiB `local-lvm` backing disk behind a fixed 4 GiB `SwapVolumeConfig` (`KubeletConfig` `LimitedSwap`, zswap 20%) — see [Architecture](./../architecture.md) and the swap verification runbook in [Operations](./../operations.md).
 
 ### Amendment 2026-09-06 — why deployed differed from original
 
@@ -89,7 +95,7 @@ Original `1×6 + 3×4` assumed TrueNAS 4 GiB and CP needing 6 GiB (~70% host). L
 * **Longhorn degraded on worker loss:** with `replicas: 2`, one worker down = single remaining replica until return. `replicas: 3` deferred until 6–8 GiB workers.
 * **CPU overcommit (144–181% limits).** RAM fixed; `pressure/io` is next bottleneck.
 
-**Mitigations adopted:** CP at 6 GiB (live 71% — 4 GiB proved tight); TrueNAS lowered to 2c/4GB; `cpu_units` 200/100 + affinity `2-5,8-11`; backup runbook in `docs/operations.md` + green restore drill as gate; `PDB maxUnavailable: 0` for `cilium-operator`, `longhorn-manager`, `argocd`.
+**Mitigations adopted:** CP at 6 GiB (live 71% — 4 GiB proved tight); TrueNAS lowered to 2c/4GB; `cpu_units` 200 on the control plane only + affinity `2-5,8-11` (workers float since 2026-09-29); backup runbook in `docs/operations.md` + green restore drill as gate; `PDB maxUnavailable: 0` for `cilium-operator`, `longhorn-manager`, `argocd`.
 
 ## Alternatives Considered
 
@@ -119,7 +125,7 @@ Run when `pve01` has ≥64 GiB usable or a second PVE node exists:
 ## References
 
 * `environments/proxmox/prod/terraform.tfvars` — `nodes_cp` / `nodes_worker`.
-* `modules/proxmox/main.tf` — VM shape, `virtio1` dynamic disk, `data_volume_patch` / `UserVolumeConfig "data"`.
+* `modules/proxmox/main.tf` — VM shape, SCSI `scsi0` OS + dynamic `scsiN` disks (`virtio-scsi-single`), `data_volume_patch` / `UserVolumeConfig "data"` / 5 GiB swap backing disk.
 * `modules/talos-cluster/main.tf` — `allow_scheduling` / taint, `control_plane_nodes`, mounts.
 * `docs/decisions.md`, `docs/architecture.md`, `docs/adr/003-sdn-snat-runtime-drift.md`.
 * Measurements: `talosctl ps` / `memory`, `pve01 status`, `kubectl describe nodes`.

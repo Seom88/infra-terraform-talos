@@ -38,7 +38,7 @@ Some `terraform.tfvars` values make Terraform **destroy and recreate the VMs** i
 
 ## Upgrading Talos
 
-Bumping `talos_version` and running `just tf-apply-upgrade` (or `just tf-apply -parallelism=1`) performs a sequential in-place upgrade via `talos_machine.image` (control planes first, then workers) with `-parallelism=1` to protect etcd quorum. The installer image comes from the Image Factory `urls` data source: `factory.talos.dev/nocloud-installer-secureboot/...` (Proxmox) or the plain `nocloud-installer/...` flavor for libvirt when `secureboot = false`. `drain_on_upgrade = false` (revisit when dedicated workers carry workloads). Bump the pin in `modules/talos-image/variables.tf` via `talos_version` (default `1.14.0`), `modules/proxmox/variables.tf`, `modules/libvirt/variables.tf` or `environments/<provider>/<env>/terraform.tfvars`, then apply.
+Bumping `talos_version` and running `just tf-apply-upgrade` (or `just tf-apply -parallelism=1`) performs a sequential in-place upgrade via `talos_machine.image` (control planes first, then workers) with `-parallelism=1` to protect etcd quorum. The installer image comes from the Image Factory `urls` data source: `factory.talos.dev/nocloud-installer-secureboot/...` (Proxmox) or the plain `nocloud-installer/...` flavor for libvirt when `secureboot = false`. `drain_on_upgrade = false` (revisit when dedicated workers carry workloads). Bump the pin in `environments/<provider>/<env>/terraform.tfvars` (current default `1.14.1`), then apply.
 
 ```bash
 # Example: bump talos_version in terraform.tfvars (or variables.tf default), then:
@@ -60,7 +60,7 @@ just provider=libvirt env=dev tf-apply-upgrade
 
 ### CPU affinity lives outside CI
 
-`cpu.affinity` on `proxmox_virtual_environment_vm` requires `root@pam`; CI applies with an API token, so the API silently drops the value. `terraform.tfvars` stays the source of truth (`cpu_affinity`, `cpu_units` per node), and both VM resources set `lifecycle { ignore_changes = [cpu[0].affinity] }` so token-based plans never fight the privileged value.
+`cpu.affinity` on `proxmox_virtual_environment_vm` requires `root@pam`; CI applies with an API token, so the API silently drops the value. `terraform.tfvars` stays the source of truth (`cpu_affinity`, `cpu_units` per node), and both VM resources set `lifecycle { ignore_changes = [cpu[0].affinity] }` so token-based plans never fight the privileged value. In prod the control-plane pin (`cpu_units = 200`, `cpu_affinity = "2-5,8-11"`) stays active while the worker pin is commented out (workers float until contention says otherwise).
 
 Two-step flow:
 
@@ -70,6 +70,17 @@ just provider=proxmox env=prod affinity-sync   # root over SSH: qm set affinity/
 ```
 
 Drift contract: if `qm config` disagrees with `tfvars`, `tfvars` wins — re-run `affinity-sync`. Never hand-edit affinity on the host; never add a second source for it.
+
+### Swap verification
+
+Each node provisions a fixed 4 GiB swap partition on its dedicated 5 GiB disk (`grow = false`). After rollout:
+
+```bash
+talosctl -n <NODE> get disks -o yaml
+talosctl -n <NODE> get swap
+talosctl -n <NODE> get zswapstatus
+talosctl -n <NODE> cgroups --preset=swap
+```
 
 ### Cilium Operations & Troubleshooting
 
@@ -124,7 +135,7 @@ kubectl -n kube-system get deploy cilium-operator -o jsonpath='{.spec.replicas}{
 kubectl -n kube-system get pods -l io.cilium/app=operator-generic
 ```
 
-Renovate tracks `cilium_version` (`1.20.1`) weekly (Mon 05:00 Europe/Madrid, `baseBranch: dev`, automerge patch/minor).
+Renovate tracks `cilium_version` (`1.20.2`) weekly (Mon 05:00 Europe/Madrid, `baseBranch: dev`, automerge patch/minor).
 
 #### Hubble relay / UI and silent drops
 

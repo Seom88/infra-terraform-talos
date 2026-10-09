@@ -75,7 +75,7 @@ just provider=libvirt env=prod tf-apply    # libvirt/prod
 | `get-schematic-id` | Read schematic ID from state (`terraform output -raw schematic_id`, canonical set in `modules/talos-image`) |
 | `cluster-schematic-id` | Read the active schematic ID from the running cluster |
 | `setup-host` | (libvirt) Ensure firewalld NAT for `virbr-talos` — masquerade + forward on zone `libvirt` (idempotent, needs sudo) |
-| `affinity-sync` | (proxmox-only, `root`) Apply `cpu_affinity`/`cpu_units` from `terraform.tfvars` via `qm set` (VMIDs resolved by hostname, `qm config` proof) |
+| `affinity-sync` | (proxmox-only, `root`) Apply `cpu_affinity`/`cpu_units` from `terraform.tfvars` via `qm set` (VMIDs resolved by hostname, `qm config` proof) — prod workers are commented out in `tfvars` since 2.3.0, so only the control-plane row is emitted |
 
 ### Quick examples
 

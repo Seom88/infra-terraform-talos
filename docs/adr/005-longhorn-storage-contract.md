@@ -21,8 +21,10 @@ This repo just finished two changes that force the contract to be explicit:
 * Talos `1.13.9` → `1.14.0` removed `machine.kubelet.extraMounts` by design
   (`KubeletConfig` in 1.14 has no `extraMounts` field). The old bind
   `/var/mnt/data` → `/var/lib/longhorn` is gone.
-* Disks from `terraform.tfvars` (`prod` workers: `data` 100GB) are now wired
-  to dynamic `UserVolumeConfig` docs — 1 name = 1 UVC → `/var/mnt/<name>`.
+* Disks from `terraform.tfvars` (`prod` workers: `data` 150 GiB on `ssd01`) are now wired
+  to dynamic `UserVolumeConfig` docs — 1 name = 1 UVC → `/var/mnt/<name>`. The dedicated
+  5 GiB swap backing disk (CHANGELOG 2.3.0) is deliberately **not** a `disks[]` entry:
+  the UVC selector `diskSelector` size floor keeps Longhorn off it.
 
 Open question was: if Longhorn is a prerequisite for almost everything else,
 should it live in infra? And does adding a 2nd/3rd disk require a GitOps change?
@@ -59,9 +61,11 @@ up by Longhorn node config, not by Helm.
 * Two-step bootstrap — infra `platform/` apply first, then GitOps sync.
 * Extra-disk registration is manual per node (`nodes.longhorn.io`) until
   label+annotation automation (`create-default-disk-labeled-nodes`) is adopted.
-* Multi-disk `diskSelector` is best-effort (`!system_disk` + size floor):
-  harden to `by-id`/`serial` matches post-bootstrap via `talosctl get disks`
-  before adding the 2nd disk, or two UVCs can race for the same disk.
+* Multi-disk `diskSelector` is best-effort (`!system_disk` + size floor): the
+  5 GiB swap backing disk is excluded by that floor (see
+  [Architecture: Memory / swap design](./../architecture.md#memory--swap-design)).
+  Harden to `by-id`/`serial` matches post-bootstrap via `talosctl get disks`
+  before adding the 2nd data disk, or two UVCs can race for the same disk.
 * First apply after removing `extraMounts` does a rolling `talos_machine`
   reboot per node — use `-parallelism=1`, verify `volumestatus` +
   `nodes.longhorn.io` Ready/Schedulable between nodes.

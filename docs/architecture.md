@@ -52,6 +52,12 @@ Terraform (environments/libvirt/<env>/)
 
 Both providers share the same provider-agnostic `modules/talos-cluster` module for Talos bootstrap and kubeconfig generation (`talos_machine.control_plane` / `talos_machine.worker` + `talos_cluster`).
 
+> **Disks:** Proxmox VMs use SCSI (`scsi0` for the system disk, `scsiN` for data/swap, `virtio-scsi-single`, `ssd=true`, `floating=0`, `model=virtio`); each extra disk accepts an optional per-disk `ssd` flag (default `true`). `install_disk_match` is required everywhere (`/dev/sda` on Proxmox, `/dev/vda` on libvirt) and selects the Talos install disk.
+
+## Memory / swap design
+
+Each VM carries one dedicated 5 GiB swap disk (Proxmox blank disk in `local-lvm`; libvirt managed QCOW2 volume in the VM pool), provisioned after the data disks. Talos creates a fixed 4 GiB `SwapVolumeConfig` on it (`grow = false`, selector `!system_disk && disk.size == 5368709120u`); Longhorn `UserVolumeConfig` selectors carry a data-disk size floor so they never claim the swap disk. Kubelet runs `memorySwap.swapBehavior: LimitedSwap`, zswap caps at 20% (`ZswapConfig.maxPoolPercent = 20`), and sysctls set `vm.swappiness = "130"` / `vm.page-cluster = "0"`. No LUKS2.
+
 ## Repository structure
 
 ```
@@ -60,7 +66,7 @@ Both providers share the same provider-agnostic `modules/talos-cluster` module f
 │   ├── deploy.yaml                 # CI: validate + single terraform apply per env (S3 state for prod)
 │   └── destroy.yaml                # CI: terraform destroy (S3 state for prod)
 ├── docs/
-│   ├── adr/                        # Architecture Decision Records (MADR: 001, 002, 003)
+│   ├── adr/                        # Architecture Decision Records (MADR: 001–006)
 │   ├── architecture.md             # ← you are here
 │   ├── networking.md               # SDN, NAT, Tailscale subnet routing
 │   ├── variables.md                # All input variables
@@ -71,7 +77,7 @@ Both providers share the same provider-agnostic `modules/talos-cluster` module f
 │   └── demo.png
 ├── environments/                   # Composed roots — one state per env (infra + platform)
 │   ├── proxmox/
-│   │   ├── dev/                    # backend local — bpg/proxmox 0.111.1, helm ~>2.17, talos 0.12.0-beta.0
+│   │   ├── dev/                    # backend local — bpg/proxmox 0.114.0, helm ~>3.2, talos 0.12.0-beta.0
 │   │   └── prod/                   # backend s3 (S3-compatible bucket terraform-homelab, key proxmox/prod/terraform.tfstate)
 │   └── libvirt/
 │       ├── dev/                    # backend local — dmacvicar/libvirt ~>0.9.8, talos 0.12.0-beta.0
@@ -108,14 +114,14 @@ flowchart TD
     G --> H[talos_cluster bootstrap]
     H --> I[talos_cluster_health gate — kube-apiserver/etcd bootstrapped]
     I --> J[Generate kubeconfig single context via subnet route 10.10.0.0/24]
-    J --> K[helm_release.gateway_api — CRDs 1.2.3 standard]
-    K --> L[helm_release.cilium — 1.20.1 Without kube-proxy + Gateway API, KubePrism 7445]
+    J --> K[helm_release.gateway_api — CRDs 1.2.4 standard]
+    K --> L[helm_release.cilium — 1.20.2 Without kube-proxy + Gateway API, KubePrism 7445]
     L --> M[terraform_data.wait_nodes — kubectl wait Ready — CNI present]
     M --> N[helm_release.argocd]
     N --> O[kubectl / talosctl ready]
 ```
 
-> **Cilium data plane:** eBPF replaces kube-proxy (`kubeProxyReplacement=true`, Talos `KubeFlannelCNIConfig` delete + `KubeProxyConfig` `enabled: false`, KubePrism `localhost:7445`). Gateway API CRDs (`christianhuth/gateway-api-crds` 1.2.3 → app v1.6.1) install before Cilium 1.20.1. The DAG is `gateway_api → cilium → wait_nodes → argocd`; this ordering ensures CRDs exist before Cilium and nodes become `Ready` only after the CNI is present. Values, socketLB configuration for `kubectl port-forward`/`exec`, and Hubble observability are detailed in [Networking: Cilium CNI](./networking.md#cilium-cni-ebpf-data-plane).
+> **Cilium data plane:** eBPF replaces kube-proxy (`kubeProxyReplacement=true`, Talos `KubeFlannelCNIConfig` delete + `KubeProxyConfig` `enabled: false`, KubePrism `localhost:7445`). Gateway API CRDs (`christianhuth/gateway-api-crds` 1.2.4) install before Cilium 1.20.2. The DAG is `gateway_api → cilium → wait_nodes → argocd`; this ordering ensures CRDs exist before Cilium and nodes become `Ready` only after the CNI is present. Values, socketLB configuration for `kubectl port-forward`/`exec`, and Hubble observability are detailed in [Networking: Cilium CNI](./networking.md#cilium-cni-ebpf-data-plane).
 
 ### Proxmox path
 

@@ -12,7 +12,7 @@ Back to [Why This Exists](../README.md#why-this-exists) · [Architecture](./arch
 | OS | [Talos Linux](https://www.talos.dev/) | Immutable and declarative — versioned, reproducible Kubernetes in a VM via Image Factory schematic |
 | Remote access | [Tailscale](https://tailscale.com/kb/1214/subnet-routers) | Subnet routing `10.10.0.0/24` for VM access, tailnet service exposure via GitOps, and CI without exposing the server |
 | Storage | [Longhorn](https://longhorn.io/) | Popular, lighter than Ceph, flexible and reliable PVC replication across nodes |
-| CNI | [Cilium](https://docs.cilium.io/) 1.20.1 | Pod-to-pod security via NetworkPolicies and microsegmentation |
+| CNI | [Cilium](https://docs.cilium.io/) 1.20.2 | Pod-to-pod security via NetworkPolicies and microsegmentation |
 | GitOps | [ArgoCD](https://argo-cd.readthedocs.io/) | Popular enterprise GitOps with App-of-Apps |
 
 > Each choice below includes the reasoning and a pointer to the relevant files.
@@ -89,7 +89,7 @@ Longhorn gives the cluster HA block storage with a simple CSI driver, homogeneou
 dual-disk nodes (`/var/mnt/data` via dynamic `UserVolumeConfig`, no kubelet `extraMounts` — see ADR 005),
 and a familiar Helm install gated by ArgoCD.
 
-**Evidence:** `modules/talos-cluster/main.tf` (dynamic UVCs) + `modules/proxmox/main.tf` (`virtio` data disks) + [ADR 005](./adr/005-longhorn-storage-contract.md).
+**Evidence:** `modules/talos-cluster/main.tf` (dynamic UVCs) + `modules/proxmox/main.tf` (SCSI data disks) + [ADR 005](./adr/005-longhorn-storage-contract.md).
 
 <a id="7-cilium-inlinemanifest-vs-helm-application"></a>
 ## 6. Cilium — pod-to-pod security and microsegmentation
@@ -98,9 +98,9 @@ I chose Cilium to improve security between pods. It replaces kube-router with
 eBPF, enabling NetworkPolicies and microsegmentation, plus Hubble observability,
 from day one.
 
-Talos disables the built-in CNI (multi-doc patch: `KubeFlannelCNIConfig` `$patch: delete` + `KubeProxyConfig` `enabled: false` in `modules/talos-cluster/main.tf:26-37`). Cilium is installed via Helm in `modules/platform` (not via Talos `cluster.inlineManifests`) to avoid state bloat and secrets in `tfstate` and keep the Helm provider flow consistent. Values follow the Sidero [Deploying Cilium](https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium) "Without kube-proxy + Gateway API" pattern (`ipam=kubernetes`, `kubeProxyReplacement=true`, `k8sServiceHost=localhost:7445` KubePrism, `cgroup.autoMount=false`, `gatewayAPI.enabled=true` in `modules/platform/values/cilium/values.yaml`). Gateway API CRDs (`christianhuth/gateway-api-crds` `1.2.3` → `v1.6.1` standard) are Helm-installed **before** Cilium (`gateway_api → cilium → wait_nodes → argocd`); this ordering is required because `gatewayAPI.enabled=true` needs CRDs to exist first.
+Talos disables the built-in CNI (multi-doc patch: `KubeFlannelCNIConfig` `$patch: delete` + `KubeProxyConfig` `enabled: false` in `modules/talos-cluster/main.tf:26-37`). Cilium is installed via Helm in `modules/platform` (not via Talos `cluster.inlineManifests`) to avoid state bloat and secrets in `tfstate` and keep the Helm provider flow consistent. Values follow the Sidero [Deploying Cilium](https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium) "Without kube-proxy + Gateway API" pattern (`ipam=kubernetes`, `kubeProxyReplacement=true`, `k8sServiceHost=localhost:7445` KubePrism, `cgroup.autoMount=false`, `gatewayAPI.enabled=true` in `modules/platform/values/cilium/values.yaml`; prod uses the lean file, dev layers `values-dev.yaml` via `cilium_values_file`). Gateway API CRDs (`christianhuth/gateway-api-crds` `1.2.4` standard) are Helm-installed **before** Cilium (`gateway_api → cilium → wait_nodes → argocd`); this ordering is required because `gatewayAPI.enabled=true` needs CRDs to exist first.
 
-**Evidence:** `modules/talos-cluster/main.tf:26-37` (`KubeFlannelCNIConfig` delete, `KubeProxyConfig` `enabled: false`) + `modules/platform/main.tf` (`helm_release.gateway_api` `1.2.3` → `helm_release.cilium` `1.20.1` → `terraform_data.wait_nodes` → `helm_release.argocd`) + `modules/platform/values/cilium/values.yaml` (Sidero Without kube-proxy + Gateway API) · Sidero [Deploying Cilium](https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium).
+**Evidence:** `modules/talos-cluster/main.tf:26-37` (`KubeFlannelCNIConfig` delete, `KubeProxyConfig` `enabled: false`) + `modules/platform/main.tf` (`helm_release.gateway_api` `1.2.4` → `helm_release.cilium` `1.20.2` → `terraform_data.wait_nodes` → `helm_release.argocd`) + `modules/platform/values/cilium/values.yaml` (Sidero Without kube-proxy + Gateway API) · Sidero [Deploying Cilium](https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium).
 
 <a id="6-argocd-vs-fluxcd"></a>
 ## 7. ArgoCD — popular enterprise GitOps
