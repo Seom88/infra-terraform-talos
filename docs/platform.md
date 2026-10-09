@@ -4,7 +4,7 @@
 
 [← Back to README](../README.md) · [Operations →](./operations.md) · [Usage →](./usage.md)
 
-> **Two-repo contract:** This repo ships the **substrate + ArgoCD** only. All platform workloads — Longhorn (wave-0, CSI-gated), Vault, SeaweedFS, monitoring, Tailscale ingress — are declared in the companion repo [secured-gitops-tailscale-homelab](https://github.com/Seom88/secured-gitops-tailscale-homelab) (`platform/` + `gitops/templates/apps/` `00-longhorn` → `04-tailscale`). For _why_ this split exists, see [Why This Exists](../README.md#why-this-exists) and [Decisions: composable ArgoCD](./decisions.md#6-argocd-vs-fluxcd).
+> **Two-repo contract:** This repo ships the **substrate + ArgoCD** only. All platform workloads — Longhorn (wave-0, CSI-gated), Vault, SeaweedFS, monitoring, Tailscale ingress — are declared in the companion repo [gitops-platform](https://github.com/Seom88/gitops-platform) (`platform/` + `gitops/templates/apps/` `00-longhorn` → `04-tailscale`). For _why_ this split exists, see [Why This Exists](../README.md#why-this-exists) and [Decisions: composable ArgoCD](./decisions.md#6-argocd-vs-fluxcd).
 
 ## Overview
 
@@ -14,7 +14,7 @@ The **platform layer** is a composable module (`modules/platform`) called from e
 - **Cilium** (`cilium`) — CNI Without kube-proxy + Gateway API (via `helm_release.cilium` `cilium/cilium` `1.20.1`, values `modules/platform/values/cilium/values.yaml`).
 - **ArgoCD** (`argocd`) — GitOps engine (via `helm_release.argocd` in `modules/platform`).
 
-Longhorn is **no longer** installed here: it is a platform app of the GitOps repo (`secured-gitops-tailscale-homelab`, `platform/longhorn`, wave 0, gated by a CSI readiness Job) — see [Decisions: Talos Longhorn prerequisites](./decisions.md#1-talos-linux-vs-kubeadm) and [Decisions: wave-0 CSI gate](./decisions.md#6-argocd-vs-fluxcd). The Longhorn node prerequisites still live in this repo at cluster level: dynamic `UserVolumeConfig` per `disks[].name` (`/var/mnt/<name>`, no kubelet `extraMounts`) and the `iscsi-tools` / `util-linux-tools` system extensions (`modules/talos-image`). See [ADR 005](./adr/005-longhorn-storage-contract.md).
+Longhorn is **no longer** installed here: it is a platform app of the GitOps repo (`gitops-platform`, `platform/longhorn`, wave 0, gated by a CSI readiness Job) — see [Decisions: Talos Longhorn prerequisites](./decisions.md#1-talos-linux-vs-kubeadm) and [Decisions: wave-0 CSI gate](./decisions.md#6-argocd-vs-fluxcd). The Longhorn node prerequisites still live in this repo at cluster level: dynamic `UserVolumeConfig` per `disks[].name` (`/var/mnt/<name>`, no kubelet `extraMounts`) and the `iscsi-tools` / `util-linux-tools` system extensions (`modules/talos-image`). See [ADR 005](./adr/005-longhorn-storage-contract.md).
 
 See `modules/platform/README.md` for the module's own README.
 

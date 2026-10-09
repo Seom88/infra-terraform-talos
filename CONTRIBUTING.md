@@ -1,4 +1,4 @@
-# Contributing to infra-talos-homelab
+# Contributing to infra-terraform-talos
 
 Thanks for your interest in contributing! This guide will help you get started.
 
@@ -21,8 +21,8 @@ Thanks for your interest in contributing! This guide will help you get started.
 
 ```bash
 # Clone the repo
-git clone https://github.com/Seom88/infra-talos-homelab.git
-cd infra-talos-homelab
+git clone https://github.com/Seom88/infra-terraform-talos.git
+cd infra-terraform-talos
 
 # Pick your provider and environment (provider=<proxmox|libvirt> env=<prod|dev>, defaults proxmox/prod)
 just provider=proxmox env=dev tf-apply    # Proxmox dev

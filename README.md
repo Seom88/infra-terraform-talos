@@ -1,15 +1,15 @@
-# infra-talos-homelab — Homelab GitOps with Talos Linux on Proxmox & Libvirt
+# infra-terraform-talos — Homelab GitOps with Talos Linux on Proxmox & Libvirt
 
 > One `terraform apply` → HA Kubernetes, reproducible, immutable.
 
 [![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.11-7B42BC?logo=terraform)](https://www.terraform.io/)
 [![Talos](https://img.shields.io/badge/Talos_Linux-1.14-000000?logo=linux)](https://www.talos.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/Seom88/infra-talos-homelab/deploy.yaml?label=CI)](https://github.com/Seom88/infra-talos-homelab/actions/workflows/deploy.yaml)
-[![Last commit](https://img.shields.io/github/last-commit/Seom88/infra-talos-homelab)](https://github.com/Seom88/infra-talos-homelab/commits/main)
+[![CI](https://img.shields.io/github/actions/workflow/status/Seom88/infra-terraform-talos/deploy.yaml?label=CI)](https://github.com/Seom88/infra-terraform-talos/actions/workflows/deploy.yaml)
+[![Last commit](https://img.shields.io/github/last-commit/Seom88/infra-terraform-talos)](https://github.com/Seom88/infra-terraform-talos/commits/main)
 [![Renovate](https://img.shields.io/badge/Renovate-enabled-brightgreen?logo=renovate)](https://docs.renovatebot.com/)
 
-[![Stars](https://img.shields.io/github/stars/Seom88/infra-talos-homelab?style=social)](https://github.com/Seom88/infra-talos-homelab/stargazers)
+[![Stars](https://img.shields.io/github/stars/Seom88/infra-terraform-talos?style=social)](https://github.com/Seom88/infra-terraform-talos/stargazers)
 
 [![Project Status](https://img.shields.io/badge/Project%20Status-Active-brightgreen)](#roadmap--changelog)
 [![Last deploy](https://img.shields.io/badge/Last%20deploy-Aug%202026-blue)](#roadmap--changelog)
@@ -39,7 +39,7 @@ Infrastructure alone isn't enough: without a distributed storage layer, Kubernet
 
 **This repo (infra):** builds the substrate — VMs, Talos bootstrap, [Proxmox SDN/NAT networking](./docs/decisions.md#2-proxmox-ve-vs-esxi-bare-metal) ([libvirt mirror](./docs/decisions.md#3-libvirt-kvm-vs-proxmox-only)), [Tailscale subnet routing](./docs/decisions.md#4-tailscale-subnet-routing-vs-per-node-extension), kubeconfig, and [ArgoCD](./docs/decisions.md#6-argocd-vs-fluxcd) as the GitOps engine — in one `terraform apply` with remote S3 state, health gates, and rolling upgrades.
 
-**Companion repo ([secured-gitops-tailscale-homelab](https://github.com/Seom88/secured-gitops-tailscale-homelab)):** declares everything that *runs* on it — [Longhorn](./docs/decisions.md#5-longhorn-vs-ceph-rook) (wave-0, CSI-gated so PVCs bind before Vault), cert-manager, Vault (HA Raft), SeaweedFS, monitoring (kube-prometheus-stack + Loki), and Tailscale ingress — via App-of-Apps sync-waves. See its [`platform/`](https://github.com/Seom88/secured-gitops-tailscale-homelab/tree/main/platform) and [`gitops/templates/apps/`](https://github.com/Seom88/secured-gitops-tailscale-homelab/tree/main/gitops/templates/apps) (`00-longhorn` → `01-vault` → `02-seaweedfs` → `03-monitoring` → `04-tailscale`).
+**Companion repo ([gitops-platform](https://github.com/Seom88/gitops-platform)):** declares everything that *runs* on it — [Longhorn](./docs/decisions.md#5-longhorn-vs-ceph-rook) (wave-0, CSI-gated so PVCs bind before Vault), cert-manager, Vault (HA Raft), SeaweedFS, monitoring (kube-prometheus-stack + Loki), and Tailscale ingress — via App-of-Apps sync-waves. See its [`platform/`](https://github.com/Seom88/gitops-platform/tree/main/platform) and [`gitops/templates/apps/`](https://github.com/Seom88/gitops-platform/tree/main/gitops/templates/apps) (`00-longhorn` → `01-vault` → `02-seaweedfs` → `03-monitoring` → `04-tailscale`).
 
 **[Cilium is the exception that stays here.](./docs/decisions.md#7-cilium-inlinemanifest-vs-helm-application)** Talos disables Flannel/kube-proxy via multi-doc patch (`KubeFlannelCNIConfig` `$patch: delete` + `KubeProxyConfig` `enabled: false` in `modules/talos-cluster/main.tf:26-37`), but Cilium itself is **Cilium 1.20.1 via Helm + Gateway API CRDs 1.2.3 (standard v1.6.1) with KubePrism `localhost:7445`** in `modules/platform` — not `inlineManifests` — to avoid manifest/secrets bloat in `tfstate` and keep the Helm provider flow (`gateway_api` → `cilium` → `wait_nodes` → `argocd`, values `modules/platform/values/cilium/values.yaml` Sidero Without kube-proxy + Gateway API). It can't be an ArgoCD Application (ArgoCD needs networking to become Healthy — circular dependency). See [Roadmap](#roadmap--changelog).
 
@@ -164,7 +164,7 @@ Details: [docs/ci-cd.md](./docs/ci-cd.md) · [docs/variables.md](./docs/variable
 - **Multi-node Proxmox SDN** (remove single-node `pve-sdn-ensure` limitation — see [ADR 003](./docs/adr/003-sdn-snat-runtime-drift.md) and [Decisions: Proxmox SDN](./docs/decisions.md#2-proxmox-ve-vs-esxi-bare-metal))
 - **Talos/Kubernetes version stream validation** ([libvirt/dev → prod promotion](./docs/decisions.md#3-libvirt-kvm-vs-proxmox-only)) — cheap validation in ephemeral [libvirt](./docs/decisions.md#3-libvirt-kvm-vs-proxmox-only) before rolling prod.
 
-> Platform workloads (Longhorn, Vault, monitoring, SeaweedFS, Tailscale ingress) are versioned and deployed from [secured-gitops-tailscale-homelab](https://github.com/Seom88/secured-gitops-tailscale-homelab) — see [its Roadmap](https://github.com/Seom88/secured-gitops-tailscale-homelab#roadmap). This repo only provides the substrate + ArgoCD.
+> Platform workloads (Longhorn, Vault, monitoring, SeaweedFS, Tailscale ingress) are versioned and deployed from [gitops-platform](https://github.com/Seom88/gitops-platform) — see [its Roadmap](https://github.com/Seom88/gitops-platform#roadmap). This repo only provides the substrate + ArgoCD.
 
 ## 👤 Author
 
@@ -174,14 +174,14 @@ Details: [docs/ci-cd.md](./docs/ci-cd.md) · [docs/variables.md](./docs/variable
 - GitHub: [github.com/Seom88](https://github.com/Seom88)
 - Based in EU — remote · Open to Platform, SRE, DevOps roles (Terraform, Kubernetes, Talos, GitOps, Proxmox, networking)
 
-If this helped you, a ⭐ on [Seom88/infra-talos-homelab](https://github.com/Seom88/infra-talos-homelab) keeps it alive — and feel free to reach out on LinkedIn.
+If this helped you, a ⭐ on [Seom88/infra-terraform-talos](https://github.com/Seom88/infra-terraform-talos) keeps it alive — and feel free to reach out on LinkedIn.
 
 ## 📚 Related Projects
 
 | Repo | Role |
 |------|------|
-| [`infra-talos-homelab`](https://github.com/Seom88/infra-talos-homelab) *(this repo)* | Cluster provisioning — Terraform + Talos, machine config patches, system extensions |
-| [`secured-gitops-tailscale-homelab`](https://github.com/Seom88/secured-gitops-tailscale-homelab) | GitOps layer — ArgoCD, Vault, Tailscale, storage, platform apps |
+| [`infra-terraform-talos`](https://github.com/Seom88/infra-terraform-talos) *(this repo)* | Cluster provisioning — Terraform + Talos, machine config patches, system extensions |
+| [`gitops-platform`](https://github.com/Seom88/gitops-platform) | GitOps layer — ArgoCD, Vault, Tailscale, storage, platform apps |
 
 ## 📄 License
 

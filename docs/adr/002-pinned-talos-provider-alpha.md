@@ -2,7 +2,7 @@
 
 * **Status:** Accepted
 * **Date:** 2026-08-28
-* **Deciders:** infra-talos-homelab maintainers
+* **Deciders:** infra-terraform-talos maintainers
 * **Tags:** talos, terraform-provider-talos, semver, pre-release, provider-pinning
 
 ## Context
@@ -269,5 +269,5 @@ terraform providers -json | jq '.provider_schemas["registry.terraform.io/siderol
 *Status Accepted on 2026-08-28 — intentional pre-release pin until stable.*
 *Review trigger: SideroLabs 0.12.0 stable release.*
 *Fallback review: 2026-12-31 if no stable version ships.*
-*Contact: infra-talos-homelab maintainers.*
+*Contact: infra-terraform-talos maintainers.*
 

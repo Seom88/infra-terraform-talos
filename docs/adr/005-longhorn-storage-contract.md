@@ -11,8 +11,8 @@ Where this ADR lives:
 
 This decision is about the **storage ownership boundary** — what the cluster
 substrate must provide vs what the GitOps layer manages. It belongs in
-`infra-talos-homelab/docs/adr/` (this repo). The companion GitOps repo
-`secured-gitops-tailscale-homelab` owns the Longhorn lifecycle decisions
+`infra-terraform-talos/docs/adr/` (this repo). The companion GitOps repo
+`gitops-platform` owns the Longhorn lifecycle decisions
 (ADR-003 moved Longhorn+ArgoCD to infra, ADR-005 moved Longhorn back to
 GitOps as wave-0 after dropping `redis-ha`).
 

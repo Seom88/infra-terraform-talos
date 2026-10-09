@@ -2,7 +2,7 @@
 
 * **Status:** Accepted
 * **Date:** 2026-08-27
-* **Deciders:** infra-talos-homelab maintainers
+* **Deciders:** infra-terraform-talos maintainers
 * **Tags:** talos, tailscale, schematic, security, networking
 
 ## Context

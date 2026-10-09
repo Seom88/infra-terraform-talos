@@ -123,7 +123,7 @@ Run when `pve01` has ≥64 GiB usable or a second PVE node exists:
 * `modules/talos-cluster/main.tf` — `allow_scheduling` / taint, `control_plane_nodes`, mounts.
 * `docs/decisions.md`, `docs/architecture.md`, `docs/adr/003-sdn-snat-runtime-drift.md`.
 * Measurements: `talosctl ps` / `memory`, `pve01 status`, `kubectl describe nodes`.
-* Companion repo `secured-gitops-tailscale-homelab/docs/adrs/` — platform ADRs.
+* Companion repo `gitops-platform/docs/adrs/` — platform ADRs.
 
 ---
 

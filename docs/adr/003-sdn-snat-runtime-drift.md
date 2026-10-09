@@ -2,7 +2,7 @@
 
 * **Status:** Accepted
 * **Date:** 2026-08-29
-* **Deciders:** infra-talos-homelab maintainers
+* **Deciders:** infra-terraform-talos maintainers
 * **Tags:** proxmox, sdn, pve, talos, networking, snat, bpg-proxmox, drift
 
 ## Context

@@ -10,7 +10,7 @@
 Host `PVE01`: i7-8700T / UHD 630 (`8086:3e92`, Gen9.5 Coffee Lake), PVE
 9.2.18, kernel `7.0.14-16-pve`, `/dev/dri/renderD128` + `card1` present,
 `i915` loaded, `libvirglrenderer1 1.1.0-2` + Mesa 25.0.7, no
-`virgl-server`. Provisioning via `infra-talos-homelab/modules/proxmox`
+`virgl-server`. Provisioning via `infra-terraform-talos/modules/proxmox`
 (`bpg/proxmox` 0.113.1, Talos VMs `q35`/`ovmf`, no `vga` block → default
 `std`). Immich runs in the secure GitOps repo with a minimal CPU-only
 `values.yaml`.
